@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Speed Limit Estimator</h1>
+    <form method="POST">
+        <input type="number" name="acceleration" placeholder="Acceleration (m/s²)" step="0.1" required><br>
+        <input type="number" name="distance_km" placeholder="Distance (km)" step="0.1" required><br>
+        <input type="number" name="battery_level" placeholder="Battery Level (%)" required><br>
+        <input type="number" name="terrain_elevation" placeholder="Terrain Elevation (-2 to 2)" required><br>
+        <input type="number" name="weather_condition" placeholder="Weather Condition (0-2)" required><br>
+        <button type="submit">Predict Speed Limit</button>
+    </form>
+    {% if speed_limit %}
+        <p>Predicted Speed Limit: {{ speed_limit|round(2) }} km/h</p>
+    {% endif %}
+    <a href="{{ url_for('wear_tear_bhi') }}">Next: Wear and Tear & BHI</a>
+</body>
+</html>

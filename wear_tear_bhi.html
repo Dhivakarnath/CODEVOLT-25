@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Wear and Tear and BHI Prediction</h1>
+    <form method="POST">
+        <button type="submit" name="predict_wear_tear">Predict Wear and Tear</button>
+        <button type="submit" name="predict_bhi">Predict BHI</button>
+    </form>
+    {% if battery_health and brake_health and tyre_health %}
+        <p>Battery Health: {{ battery_health|round(2) }}%</p>
+        <p>Brake Health: {{ brake_health|round(2) }}%</p>
+        <p>Tyre Health: {{ tyre_health|round(2) }}%</p>
+    {% endif %}
+    {% if bhi %}
+        <p>Battery Health Index (BHI): {{ bhi|round(2) }}%</p>
+    {% endif %}
+    <a href="{{ url_for('summary_report') }}">Next: Summary Report</a>
+</body>
+</html>
