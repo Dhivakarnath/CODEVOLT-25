@@ -1,18 +1,184 @@
-<!DOCTYPE html>
-<html>
-<body>
-    <h1>Speed Limit Estimator</h1>
-    <form method="POST">
-        <input type="number" name="acceleration" placeholder="Acceleration (m/s²)" step="0.1" required><br>
-        <input type="number" name="distance_km" placeholder="Distance (km)" step="0.1" required><br>
-        <input type="number" name="battery_level" placeholder="Battery Level (%)" required><br>
-        <input type="number" name="terrain_elevation" placeholder="Terrain Elevation (-2 to 2)" required><br>
-        <input type="number" name="weather_condition" placeholder="Weather Condition (0-2)" required><br>
-        <button type="submit">Predict Speed Limit</button>
-    </form>
-    {% if speed_limit %}
-        <p>Predicted Speed Limit: {{ speed_limit|round(2) }} km/h</p>
-    {% endif %}
-    <a href="{{ url_for('wear_tear_bhi') }}">Next: Wear and Tear & BHI</a>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Speed Limit Estimator{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Speed Limit Estimator</h1>
+    <div class="card shadow-sm p-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="acceleration" class="form-label">Acceleration (m/s²): <span id="acceleration-value">0</span></label>
+                    <input type="range" class="form-range" id="acceleration" name="acceleration" min="0" max="5" step="0.1" value="0">
+                </div>
+                <div class="mb-3">
+                    <label for="distance_km" class="form-label">Distance (km): <span id="distance_km-value">0</span></label>
+                    <input type="range" class="form-range" id="distance_km" name="distance_km" min="0" max="100" step="1" value="0">
+                </div>
+                <div class="mb-3">
+                    <label for="battery_level" class="form-label">Battery Level (%): <span id="battery_level-value">0</span></label>
+                    <input type="range" class="form-range" id="battery_level" name="battery_level" min="0" max="100" step="1" value="0">
+                </div>
+                <div class="mb-3">
+                    <label for="terrain_elevation" class="form-label">Terrain Elevation</label>
+                    <select class="form-select" id="terrain_elevation" name="terrain_elevation">
+                        <option value="-2">-2 (Steep Downhill)</option>
+                        <option value="-1">-1 (Mild Downhill)</option>
+                        <option value="0" selected>0 (Flat)</option>
+                        <option value="1">1 (Mild Uphill)</option>
+                        <option value="2">2 (Steep Uphill)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="weather_condition" class="form-label">Weather Condition</label>
+                    <select class="form-select" id="weather_condition" name="weather_condition">
+                        <option value="0" selected>Normal</option>
+                        <option value="1">Hot</option>
+                        <option value="2">Wet</option>
+                    </select>
+                </div>
+                <button id="predict-button" class="btn btn-primary mt-2">Predict Now</button>
+            </div>
+            <div class="col-md-6 text-center">
+                <h3 class="mb-3">Predicted Speed Limit</h3>
+                <div id="odometer" class="odometer" style="font-size: 3em; color: #007bff;">0</div>
+                <p class="mt-2">km/h</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4 p-4">
+        <h2 class="mb-3">Past Predictions</h2>
+        <button onclick="clearHistory('speed_limit')" class="btn btn-outline-danger mb-3">Clear History</button>
+        <div id="history-list" class="list-group" style="max-height: 200px; overflow-y: auto;">
+            {% for entry in history %}
+                <div class="list-group-item">
+                    <strong>{{ entry.timestamp }}</strong><br>
+                    Speed Limit: {{ entry.speed_limit|round(2) }} km/h
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="nav-buttons text-center mt-4">
+        <a href="{{ url_for('wear_tear_bhi') }}" class="btn btn-primary">Next: Wear and Tear & BHI</a>
+    </div>
+</div>
+
+<!-- Bootstrap 5 CSS and JS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Odometer JS and CSS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/odometer.js/0.4.8/odometer.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/odometer.js/0.4.8/themes/odometer-theme-default.min.css">
+
+<script>
+    // Initialize odometer
+    var odometer = new Odometer({
+        el: document.querySelector('#odometer'),
+        value: 0,  // Start at 0 explicitly
+        format: '(,ddd).dd',
+        duration: 500
+    });
+
+    // Update value display next to sliders
+    function updateValueDisplay(id, value) {
+        console.log(`Updating ${id} display to ${value}`);
+        document.getElementById(`${id}-value`).textContent = value;
+    }
+
+    // Update history list dynamically
+    function updateHistory(history) {
+        console.log("Updating history with:", history);
+        const historyList = document.getElementById('history-list');
+        historyList.innerHTML = ''; // Clear current list
+        history.forEach(entry => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item';
+            item.innerHTML = `
+                <strong>${entry.timestamp}</strong><br>
+                Speed Limit: ${entry.speed_limit.toFixed(2)} km/h
+            `;
+            historyList.appendChild(item);
+        });
+    }
+
+    // Predict speed limit via AJAX
+    function predictSpeedLimit() {
+        console.log("Starting prediction...");
+        const data = {
+            acceleration: document.getElementById('acceleration').value,
+            distance_km: document.getElementById('distance_km').value,
+            battery_level: document.getElementById('battery_level').value,
+            terrain_elevation: document.getElementById('terrain_elevation').value,
+            weather_condition: document.getElementById('weather_condition').value
+        };
+        console.log("Data to send:", data);
+
+        fetch('/predict_speed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            console.log("Response status:", response.status);
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(`HTTP error! Status: ${response.status}, Body: ${text}`); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Response data:", data);
+            if (data.error) {
+                console.error('Prediction error:', data.error);
+                alert('Prediction failed: ' + data.error);
+            } else {
+                odometer.update(data.speed_limit);
+                updateHistory(data.history);
+                console.log("Odometer updated to:", data.speed_limit);
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert('Error predicting speed limit: ' + error.message);
+        });
+    }
+
+    // Event listeners for immediate updates
+    ['acceleration', 'distance_km', 'battery_level'].forEach(id => {
+        const slider = document.getElementById(id);
+        updateValueDisplay(id, slider.value); // Initial display
+        slider.addEventListener('input', function() {
+            updateValueDisplay(id, this.value);
+            predictSpeedLimit();
+        });
+    });
+
+    ['terrain_elevation', 'weather_condition'].forEach(id => {
+        const dropdown = document.getElementById(id);
+        dropdown.addEventListener('change', function() {
+            console.log(`${id} changed to ${this.value}`);
+            predictSpeedLimit();
+        });
+    });
+
+    // Manual predict button
+    document.getElementById('predict-button').addEventListener('click', predictSpeedLimit);
+
+    // Initial prediction with all zeros
+    predictSpeedLimit();
+
+    function clearHistory(tab) {
+        fetch('/clear_history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tab: tab })
+        })
+        .then(() => {
+            console.log(`Cleared history for ${tab}`);
+            updateHistory([]); // Clear history display
+            odometer.update(0); // Reset odometer
+        });
+    }
+</script>
+{% endblock %}
